@@ -1,0 +1,50 @@
+#!/usr/bin/expect -f
+set timeout -1
+
+set prompt "gpg> "
+
+set email [linsert $argv 0 ]
+set master_fingerprint [exec cat /home/pi/masterfingerprint]
+set master_passphrase [exec cat /home/pi/master_passphrase]
+
+proc passphrase {master_passphrase} {
+  expect {
+    "passphrase" {
+      send "$master_passphrase\r"
+      exp_continue
+    }
+    eof
+  }
+}
+
+spawn sh -c "gpg --export-secret-keys $master_fingerprint > /home/pi/master.key "
+
+passphrase $master_passphrase
+
+spawn sh -c "gpg --armor --export-secret-subkeys $master_fingerprint > /home/pi/sub.key "
+
+passphrase $master_passphrase
+
+spawn sh -c "gpg --armor --gen-revoke $master_fingerprint > /home/pi/revoke.asc"
+expect "Create a revocation certificate"
+send "y\r"
+expect "Your decision"
+send "0\r"
+expect ">"
+send "\r"
+expect "Is this okay"
+send "y\r"
+
+passphrase $master_passphrase
+
+spawn sh -c "gpg --armor --export $master_fingerprint > /home/pi/public_key.txt"
+expect eof
+
+spawn sh -c "gpg2paper.py export --keyid `cat /home/pi/masterfingerprint` -n 10 -png -o /home/pi/masterkey"
+passphrase $master_passphrase
+
+spawn paper_store_sparse.sh master.key
+expect eof
+
+spawn paper_store_sparse.sh sub.key
+expect eof

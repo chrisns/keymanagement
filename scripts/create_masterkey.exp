@@ -1,0 +1,57 @@
+#!/usr/bin/expect -f
+set timeout -1
+
+send_user -- "In 10 seconds this will destructively without further prompt create a master key\n\n"
+
+sleep 10
+
+set keyprompt "\\? "
+
+spawn sh -c "gpg --gen-random --armor 0 24 > /home/pi/master_passphrase"
+expect eof
+set master_passphrase [exec cat /home/pi/master_passphrase]
+
+spawn gpg --expert --full-generate-key
+expect $keyprompt
+send "8\r"
+
+expect "Current allowed actions: Sign Certify Encrypt"
+send "E\r"
+expect $keyprompt
+send "S\r"
+expect "Current allowed actions: Certify"
+send "Q\r"
+
+expect "What keysize do you want"
+send "4096\r"
+
+expect "Key is valid for"
+send "0\r"
+
+expect "Key does not expire at all"
+expect $keyprompt
+send "y\r"
+
+expect "Real name:"
+interact -o "Email address" return
+interact -o "Comment" return
+send "\r"
+expect "(O)kay"
+send "O\r"
+
+expect "passphrase"
+send "$master_passphrase\r"
+expect "re-enter"
+send "$master_passphrase\r"
+
+expect {
+  -re "(?:key )(.*)(?: marked as ultimately)" {
+    set master_fingerprint $expect_out(1,string)
+  }
+}
+
+spawn sh -c "echo $master_fingerprint > /home/pi/masterfingerprint"
+expect eof
+
+send_user -- "passphrase is $master_passphrase\n\n"
+send_user -- "master finger print is $master_fingerprint\n"

@@ -1,0 +1,55 @@
+#!/usr/bin/expect -f
+set timeout -1
+
+set prompt "gpg/card> "
+
+set master_fingerprint [exec cat /home/pi/masterfingerprint]
+set master_passphrase [exec cat /home/pi/master_passphrase]
+
+send_user "this will wipe whatever is on the yubikey\n\n^C now or forever hold your peace\n\n"
+sleep 10
+
+spawn sh -c "gpg --card-edit"
+
+proc passphrase {master_passphrase} {
+  expect "passphrase"
+  send "$master_passphrase\r"
+}
+
+proc keytocard {keyid key_to_send master_passphrase} {
+  send "key $keyid\r"
+  expect "ssb*"
+  send "keytocard\r"
+  expect "Your selection"
+  send "$key_to_send\r"
+  passphrase $master_passphrase
+  expect "PIN"
+  send "12345678\r"
+  expect "PIN"
+  send "12345678\r"
+  expect "gpg> "
+  send "key 0\r"
+  expect "gpg> "
+}
+
+expect $prompt
+send "admin\r"
+expect $prompt
+send "factory-reset\r"
+expect "Continue"
+send "y\r"
+expect "Really do a factory reset"
+send "yes\r"
+expect $prompt
+send "quit\r"
+expect eof
+
+spawn gpg --edit-key $master_fingerprint
+set prompt "gpg>"
+expect $prompt
+keytocard 1 1 $master_passphrase
+keytocard 2 2 $master_passphrase
+keytocard 3 3 $master_passphrase
+
+send "save\r"
+expect eof

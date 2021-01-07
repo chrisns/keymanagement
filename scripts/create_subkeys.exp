@@ -1,0 +1,53 @@
+#!/usr/bin/expect -f
+set timeout -1
+
+send_user -- "In 10 seconds this will destructively create sub keys"
+
+sleep 10
+
+set prompt "gpg> "
+
+set master_fingerprint [exec cat /home/pi/masterfingerprint]
+set master_passphrase [exec cat /home/pi/master_passphrase]
+
+spawn gpg --expert --edit-key $master_fingerprint
+expect $prompt
+
+proc addkey {selection master_passphrase} {
+  send "addkey\r"
+  expect "selection?"
+  send "$selection\r"
+  if {$selection == 8} {
+    expect "Current allowed actions: Sign Encrypt"
+    expect "?"
+    send "S\r"
+    expect "?"
+    send "E\r"
+    expect "?"
+    send "A\r"
+    expect "Current allowed actions: Authenticate"
+    expect "?"
+    send "Q\r"
+  }
+  expect "What keysize do you want?"
+  send "4096\r"
+  expect "Key is valid for?"
+  send "5y\r"
+  expect "Is this correct?"
+  send "y\r"
+  expect "Really create?"
+  send "y\r"
+
+  expect "passphrase"
+  send "$master_passphrase\r"
+
+  expect "gpg> "
+}
+
+addkey 4 $master_passphrase
+addkey 6 $master_passphrase
+addkey 8 $master_passphrase
+
+send "save\r"
+
+expect eof

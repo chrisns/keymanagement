@@ -1,0 +1,48 @@
+#!/usr/bin/expect -f
+set timeout -1
+
+set prompt "gpg/card> "
+
+set master_fingerprint [exec cat /home/pi/masterfingerprint]
+set master_passphrase [exec cat /home/pi/master_passphrase]
+
+
+spawn sh -c "gpg --card-edit"
+
+proc passphrase {master_passphrase} {
+  expect {
+    "passphrase" {
+      send "$master_passphrase\r"
+      exp_continue
+    }
+    eof
+  }
+}
+
+expect $prompt
+send "admin\r"
+expect $prompt
+send "passwd\r"
+expect "Your selection"
+send "1\r"
+expect "PIN"
+interact -o "PIN changed" return
+expect "Your selection"
+
+send "3\r"
+expect "Admin PIN"
+interact -o "PIN changed" return
+send "Q\r"
+expect $prompt
+
+send "name\r"
+interact -o $prompt return
+
+send "lang\r"
+expect "Language preference"
+send "en\r"
+
+expect $prompt
+send "quit\r"
+
+expect eof

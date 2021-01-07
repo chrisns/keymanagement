@@ -1,0 +1,145 @@
+---
+- hosts: all
+  become: yes
+  strategy: free
+
+  tasks:
+    - name: stop gui
+      systemd:
+        name: lightdm
+        state: stopped
+
+    - copy:
+        src: scripts
+        dest: /home/pi
+        owner: pi
+        group: pi
+        mode: 0755
+
+    - name: update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Check if swap enabled
+      shell: swapon -s | wc -l
+      register: swap_enabled
+
+    - name: Disable swap
+      shell: "dphys-swapfile {{ item }}"
+      with_items: 
+        - swapoff
+      when: swap_enabled.stdout != "0"
+
+    - user:
+        name: root
+        password: "{{ 'raspberry' | password_hash('sha512', 'mysecretsalt') }}"
+
+    - name: system is up to date
+      apt:
+        upgrade: dist
+
+    - name: Install packages
+      apt: 
+        name:
+          - libpam-yubico
+          - paperkey 
+          - python-yubico
+          - python-yubico-tools
+          - python3-yubikey-manager
+          - ykcs11
+          - yubico-piv-tool
+          - yubikey-luks
+          - yubikey-manager
+          - yubikey-personalization
+          - yubikey-personalization-gui
+          - yubikey-piv-manager
+          - yubikey-val
+          - yubioath-desktop 
+          - poppler-utils
+          - texlive-fonts-recommended
+          - texlive-latex-base
+          - qrencode
+          - zbar-tools
+          - expect
+          - imagemagick
+          - hopenpgp-tools
+          - a2ps
+          - pcscd
+          - scdaemon
+          - gnupg2
+          - vim
+          - pcsc-tools
+        state: latest
+        install_recommends: no
+
+    - name: Install pip modules
+      pip:
+        name:
+          - pillow
+          - qrcode
+
+    - name: fstab mount the usb volume
+      blockinfile:
+        path: /etc/fstab
+        block: |
+          /dev/sda1 /usb vfat umask=000,nofail
+          /dev/sdb1 /usb2 vfat umask=000,nofail
+
+    - file:
+        state: directory
+        path: /usb
+
+    - file:
+        state: directory
+        path: /usb2
+
+    - file:
+        state: directory
+        path: /home/pi/.gnupg
+
+    - cron:
+        special_time: reboot
+        name: try renew key
+        job: /home/pi/scripts/renew_key.sh
+        user: pi
+
+    - name: install https://github.com/nurupo/paper-store
+      get_url:
+        url: https://raw.githubusercontent.com/nurupo/paper-store/master/paper_store_sparse.sh
+        dest: /usr/local/bin/paper_store_sparse.sh
+        mode: 0755
+        
+    - name: install https://github.com/balos1/easy-gpg-to-paper
+      get_url:
+        url: https://raw.githubusercontent.com/balos1/easy-gpg-to-paper/master/gpg2paper/gpg2paper.py
+        dest: /usr/local/bin/gpg2paper.py
+        mode: 0755
+
+    - name: get gpg config
+      get_url:
+        url: https://raw.githubusercontent.com/drduh/config/master/gpg.conf
+        dest: /home/pi/.gnupg/gpg.conf
+
+    - name: hack required for https://stackoverflow.com/questions/52998331/imagemagick-security-policy-pdf-blocking-conversion
+      lineinfile:
+        path: /etc/ImageMagick-6/policy.xml
+        line: '  <policy domain="coder" rights="none" pattern="PDF" />'
+        state: absent
+
+    - name: disable services
+      with_items:
+        - networking
+        - systemd-timesyncd
+        - apache2
+        - bluetooth
+        - mariadb
+        - mysql
+        - rsync
+        - cups
+        - dphys-swapfile
+        - wpa_supplicant
+        - ssh
+      systemd:
+        name: "{{item}}"
+        state: stopped
+        enabled: no

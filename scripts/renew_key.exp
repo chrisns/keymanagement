@@ -1,0 +1,39 @@
+#!/usr/bin/expect -f
+set timeout -1
+
+set master_fingerprint [exec cat /home/pi/masterfingerprint]
+set master_passphrase [exec cat /home/pi/master_passphrase]
+spawn sh -c "sudo date +%s -s @`gpg --with-colons --fixed-list-mode --list-keys --ignore-valid-from $master_fingerprint | grep sub | head -n 1 | cut -d: -f7`"
+expect eof
+
+spawn gpg --edit-key $master_fingerprint
+set prompt "gpg>"
+expect $prompt
+send "key 1\r"
+expect $prompt
+send "key 2\r"
+expect $prompt
+send "key 3\r"
+expect $prompt
+send "expire\r"
+expect "Are you sure you want to change the expiration time for multiple subkeys"
+send "y\r"
+expect "Key is valid for"
+send "12m\r"
+expect "Is this correct"
+send "y\r"
+expect {
+  "passphrase" {
+    send "$master_passphrase\r"
+    exp_continue
+  }
+  $prompt
+}
+send "save\r"
+expect eof
+spawn sh -c "gpg --armor --export $master_fingerprint > /home/pi/public_key.txt"
+expect eof
+spawn sh -c "cp /home/pi/public_key.txt /usb2/"
+expect eof
+spawn sh -c "cp /home/pi/public_key.txt /usb/"
+expect eof
