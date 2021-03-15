@@ -12,7 +12,7 @@ Use a spare raspberry pi3b+ I had spare
 
 ## Usage
 
-1. plug the pi into a screen and keyboard with **NO NETWORK** (though the ansible should have disabled that)
+1. plug the pi into a screen and keyboard with [**NO NETWORK**](https://google.com) (though the ansible should have disabled that)
 
 1. set the time on the pi
 
